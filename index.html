@@ -49,31 +49,52 @@
         
     </style>
         <script>
+            document.addEventListener('DOMContentLoaded', () => {
+                const fullscreenButton = document.getElementById('fullscreenButton');
+                let isFullscreen = false;
         
-            fullscreenButton.addEventListener('click', () => {
-            if (document.documentElement.requestFullscreen) {
-                document.documentElement.requestFullscreen();
-            } else if (document.documentElement.mozRequestFullScreen) { // Firefox
-                document.documentElement.mozRequestFullScreen();
-            } else if (document.documentElement.webkitRequestFullscreen) { // Chrome, Safari and Opera
-                document.documentElement.webkitRequestFullscreen();
-            } else if (document.documentElement.msRequestFullscreen) { // IE/Edge
-                document.documentElement.msRequestFullscreen();
-            }
-
-            if (document.exitFullscreen) {
-                document.exitFullscreen();
-            } else if (document.mozCancelFullScreen) { // Firefox
-                document.mozCancelFullScreen();
-            } else if (document.webkitExitFullscreen) { // Chrome, Safari and Opera
-                document.webkitExitFullscreen();
-            } else if (document.msExitFullscreen) { // IE/Edge
-                document.msExitFullscreen();
-            }
-        });
-
+                fullscreenButton.addEventListener('click', async () => {
+                    try {
+                        if (!isFullscreen) {
+                            if (document.documentElement.requestFullscreen) {
+                                await document.documentElement.requestFullscreen();
+                            } else if (document.documentElement.mozRequestFullScreen) { // Firefox
+                                await document.documentElement.mozRequestFullScreen();
+                            } else if (document.documentElement.webkitRequestFullscreen) { // Chrome, Safari and Opera
+                                await document.documentElement.webkitRequestFullscreen();
+                            } else if (document.documentElement.msRequestFullscreen) { // IE/Edge
+                                await document.documentElement.msRequestFullscreen();
+                            }
+                        } else {
+                            if (document.exitFullscreen) {
+                                await document.exitFullscreen();
+                            } else if (document.mozCancelFullScreen) { // Firefox
+                                await document.mozCancelFullScreen();
+                            } else if (document.webkitExitFullscreen) { // Chrome, Safari and Opera
+                                await document.webkitExitFullscreen();
+                            } else if (document.msExitFullscreen) { // IE/Edge
+                                await document.msExitFullscreen();
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Error attempting to toggle fullscreen mode:', error);
+                    }
+                });
         
-    </script>
+                document.addEventListener('fullscreenchange', () => {
+                    isFullscreen = !!document.fullscreenElement;
+                });
+                document.addEventListener('mozfullscreenchange', () => {
+                    isFullscreen = !!document.mozFullScreenElement;
+                });
+                document.addEventListener('webkitfullscreenchange', () => {
+                    isFullscreen = !!document.webkitFullscreenElement;
+                });
+                document.addEventListener('msfullscreenchange', () => {
+                    isFullscreen = !!document.msFullscreenElement;
+                });
+            });
+        </script>
     <script type="importmap">
         {
             "imports": {
