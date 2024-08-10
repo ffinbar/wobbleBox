@@ -170,31 +170,6 @@
                 camera.updateProjectionMatrix();
                 renderer.setSize(window.innerWidth, window.innerHeight);
             };
-
-            let wakeLock = null;
-
-            async function requestWakeLock() {
-                try {
-                    wakeLock = await navigator.wakeLock.request('screen');
-                    console.log('Wake Lock is active');
-                } catch (err) {
-                    console.error(`${err.name}, ${err.message}`);
-                }
-            }
-
-            function releaseWakeLock() {
-                if (wakeLock !== null) {
-                    wakeLock.release()
-                        .then(() => {
-                            wakeLock = null;
-                            console.log('Wake Lock is released');
-                        });
-                }
-            }
-
-            window.addEventListener('load', requestWakeLock);
-
-            // window.addEventListener('unload', releaseWakeLock);
             
             canvas.addEventListener('touchstart', onTouchStart, false);
 
