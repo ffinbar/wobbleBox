@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wobble Box</title>
+</head>
+<body>  
+        <ul id="buttons">
+            <button id="fullscreenButton">Go Fullscreen</button>
+            <button id="clearBodies">Clear Objects</button>
+        </ul>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+        }
+
+        #buttons {
+            margin: 0;
+            padding: 1rem;
+            position: absolute;
+            top: 10px;
+            right: 0;
+            left: 0;
+            z-index: 100;
+            user-select: none;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            cursor: pointer;
+            display: flex;
+            flex-direction: row;
+            justify-content: space-between;
+        }
+
+        #buttons button {
+            padding: 0.5rem 1rem;
+            margin: 0 0.5rem;
+            border: none;
+            background-color: #333;
+            color: #fff;
+            font-size: 1rem;
+            cursor: pointer;
+            border-radius: 0.25rem;
+            transition: background-color 0.3s;
+            opacity: 0.5;
+        }
+        
+    </style>
+        <script>
+        
+            fullscreenButton.addEventListener('click', () => {
+            if (document.documentElement.requestFullscreen) {
+                document.documentElement.requestFullscreen();
+            } else if (document.documentElement.mozRequestFullScreen) { // Firefox
+                document.documentElement.mozRequestFullScreen();
+            } else if (document.documentElement.webkitRequestFullscreen) { // Chrome, Safari and Opera
+                document.documentElement.webkitRequestFullscreen();
+            } else if (document.documentElement.msRequestFullscreen) { // IE/Edge
+                document.documentElement.msRequestFullscreen();
+            }
+
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+            } else if (document.mozCancelFullScreen) { // Firefox
+                document.mozCancelFullScreen();
+            } else if (document.webkitExitFullscreen) { // Chrome, Safari and Opera
+                document.webkitExitFullscreen();
+            } else if (document.msExitFullscreen) { // IE/Edge
+                document.msExitFullscreen();
+            }
+        });
+
+        
+    </script>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.164.1/build/three.module.js",
+                "cannon-es": "https://unpkg.com/cannon-es/dist/cannon-es.js"
+            }
+    
+        }
+    </script>
+    <script type="module">
+        import * as THREE from 'three';
+        import * as CANNON from 'cannon-es';
+        import { OrbitControls } from 'https://unpkg.com/three/examples/jsm/controls/OrbitControls.js';
+        import { EffectComposer } from 'https://unpkg.com/three/examples/jsm/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'https://unpkg.com/three/examples/jsm/postprocessing/RenderPass.js';
+        import { UnrealBloomPass } from 'https://unpkg.com/three/examples/jsm/postprocessing/UnrealBloomPass.js';
+        import { OutputPass } from 'https://unpkg.com/three/examples/jsm/postprocessing/OutputPass.js';
+        import CannonDebugger from 'https://unpkg.com/cannon-es-debugger@1.0.0/dist/cannon-es-debugger.js'
+        import Stats from 'https://unpkg.com/three/examples/jsm/libs/stats.module.js';
+        import { RectAreaLightUniformsLib } from 'https://unpkg.com/three/examples/jsm/lights/RectAreaLightUniformsLib.js';
+        import { RectAreaLightHelper } from 'https://unpkg.com/three/examples/jsm/helpers/RectAreaLightHelper.js';
+        import { Reflector } from 'https://unpkg.com/three/examples/jsm/objects/Reflector.js';
+        import { DeviceOrientationControls } from './DeviceOrientationControls.js';
+        import { BokehPass } from 'https://unpkg.com/three/examples/jsm/postprocessing/BokehPass.js';
+        import { RenderPixelatedPass } from 'https://unpkg.com/three/examples/jsm/postprocessing/RenderPixelatedPass.js';
+        import { RGBELoader } from 'https://unpkg.com/three/examples/jsm/loaders/RGBELoader.js';
+
+        RectAreaLightUniformsLib.init();
+
+        let touchX, touchY;
+
+        let renderer, scene, camera, controls, light, world, composer, stats, canvas;
+        let cannonDebugger;
+        let mesh;
+        let xPanel, yPanel, zPanel;
+        let clock = new THREE.Clock();
+        let boxBody;
+        let testBox;
+        let respawnPoint;
+
+        let cubeRenderTarget;
+        let cubeCamera;
+        let reflectMaterial;
+
+        let meshMap = new Map();
+
+        let debugCube;
+
+        init();
+
+
+        let fullscreenButton = document.getElementById('fullscreenButton');
+        let clearBodiesButton = document.getElementById('clearBodies');
+
+        clearBodiesButton.addEventListener('click', () => {
+            clearBodies();
+        });
+
+        // fullscreenButton.addEventListener('click', () => {
+        //     setTimeout(() => {
+        //         init();
+        //     }, 1000);
+        // }, { once: true });
+
+        document.addEventListener('fullscreenchange', () => {
+            if (document.fullscreenElement) {
+                console.log('Entered fullscreen mode');
+                fullscreenButton.textContent = 'Exit Fullscreen';
+                // resetandInit();
+                
+            } else {
+                console.log('Exited fullscreen mode');
+                fullscreenButton.textContent = 'Go Fullscreen';
+            }
+        });
+
+        function init() {
+
+
+            sceneSetup();
+            rendererSetup();
+            statsSetup();
+
+            cameraSetup();
+            lightSetup();
+            worldSetup();
+            objectSetup();
+            postProcessingSetup();
+            controlsSetup();
+            debugSetup();
+
+            window.onresize = () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            };
+
+            let wakeLock = null;
+
+            async function requestWakeLock() {
+                try {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                    console.log('Wake Lock is active');
+                } catch (err) {
+                    console.error(`${err.name}, ${err.message}`);
+                }
+            }
+
+            function releaseWakeLock() {
+                if (wakeLock !== null) {
+                    wakeLock.release()
+                        .then(() => {
+                            wakeLock = null;
+                            console.log('Wake Lock is released');
+                        });
+                }
+            }
+
+            window.addEventListener('load', requestWakeLock);
+
+            // window.addEventListener('unload', releaseWakeLock);
+            
+            canvas.addEventListener('touchstart', onTouchStart, false);
+
+            canvas.addEventListener('touchend', onTouchEnd, false);
+
+            canvas.addEventListener('touchmove', onTouchMove, false);
+
+        }
+
+        let intervalId = null;
+
+        function onTouchStart(event) {
+
+            let finalPosition = getTouchPos(event);
+
+            // Create a new object at the final position
+            createObjectAt(finalPosition);
+        }
+
+        function getTouchPos(event) {
+            // Get touch coordinates
+            touchX = event.touches[0].clientX
+            touchY = event.touches[0].clientY
+
+            // Normalize the coordinates
+            let widthOffset = (touchX / window.innerWidth) * 2 - 1;
+            let heightOffset = -(touchY / window.innerHeight) * 2 + 1;
+
+            //Get respawn point world position
+            let finalPosition = new THREE.Vector3();
+            respawnPoint.getWorldPosition(finalPosition);
+
+            let worldQuaternion = new THREE.Quaternion();
+            respawnPoint.getWorldQuaternion(worldQuaternion);
+
+            let windowWidth = window.innerWidth / 100;
+            let windowHeight = window.innerHeight / 100;
+
+            // Calculate the final position based on the respawn point and normalized coordinates
+            let localOffset = new THREE.Vector3(
+                windowWidth * widthOffset,
+                windowHeight * heightOffset,
+                0
+            );
+
+            localOffset.applyQuaternion(worldQuaternion);
+
+            xPanel.update(localOffset.x);
+            yPanel.update(localOffset.y);
+
+            finalPosition.add(localOffset);
+
+            return finalPosition;
+        }
+
+        function onTouchEnd(event) {
+
+        }
+
+        let lastObjectCreationTime = 0;
+        const objectCreationInterval = 100; // Time interval in milliseconds
+
+
+        function onTouchMove(event) {
+            let currentTime = Date.now();
+            if (currentTime - lastObjectCreationTime >= objectCreationInterval) {
+                let finalPosition = getTouchPos(event);
+
+                // Create a new object at the final position
+                createObjectAt(finalPosition);
+
+                // Update the last object creation time
+                lastObjectCreationTime = currentTime;
+            }
+        }
+
+        let pointLights = [];
+
+        function createObjectAt(position) {
+            let randomScale = Math.random() * 0.8 + 0.2;
+            let randomColor = 0xffffff * Math.random();
+
+            let body = new CANNON.Body({ mass: 5 });
+            let shapes = [
+                new CANNON.Box(new CANNON.Vec3(randomScale*0.66, randomScale*0.66, randomScale*0.66)),
+                new CANNON.Sphere(randomScale),
+                new CANNON.Cylinder(randomScale, 0, randomScale*1.5, 16),
+            ];
+
+            let randomShape = shapes[Math.floor(Math.random() * shapes.length)];
+
+            body.addShape(randomShape);
+            body.position.copy(position);
+            world.addBody(body);
+
+            let mesh = new THREE.Mesh(
+                randomShape instanceof CANNON.Box ? new THREE.BoxGeometry(randomScale * 2, randomScale * 2, randomScale * 2) :
+                randomShape instanceof CANNON.Sphere ? new THREE.SphereGeometry(randomScale, 16, 16) :
+                new THREE.CylinderGeometry(randomScale, 0, randomScale*1.5, 16),
+                new THREE.MeshPhysicalMaterial({ color: randomColor, metalness: 1, roughness: 0.1, side: THREE.FrontSide })
+            );
+
+            mesh.position.copy(position);
+            scene.add(mesh);
+
+            if(pointLights.length < 5) {
+                let pointLight = new THREE.PointLight(randomColor, 5);
+                pointLight.castShadow = false;
+                pointLight.position.set(0, 0, 0);
+                mesh.add(pointLight);
+                pointLights.push(pointLight);
+            } else {
+                let randomIndex = Math.floor(Math.random() * pointLights.length);
+                let pointLight = pointLights[randomIndex];
+                pointLight.color.set(randomColor);
+                pointLight.intensity = 5;
+                mesh.add(pointLight);
+            }
+
+            mesh.castShadow = true;
+            mesh.receiveShadow = true;
+
+            meshMap.set(body, mesh);
+
+
+
+
+
+
+            if (world.bodies.length > 100) {
+                let bodyToRemove = world.bodies.shift();
+                if (bodyToRemove !== boxBody) {
+                    let meshToRemove = meshMap.get(bodyToRemove);
+                    scene.remove(meshToRemove);
+                    world.removeBody(bodyToRemove);
+                    meshMap.delete(bodyToRemove);
+                } else {
+                    // If the body to remove is boxBody, push it back to the end of the array
+                    world.bodies.push(bodyToRemove);
+                }
+            }
+        }
+
+        function clearBodies() {
+            if (world) {
+                let i = 0;
+                while (i < world.bodies.length) {
+                    let body = world.bodies[i];
+                    if (body !== boxBody) {
+                        let meshToRemove = meshMap.get(body);
+                        scene.remove(meshToRemove);
+                        world.removeBody(body);
+                        meshMap.delete(body);
+                    } else {
+                        i++;
+                    }
+                }
+            }
+            pointLights.forEach((pointLight) => {
+                scene.remove(pointLight);
+            });
+            pointLights = [];
+        }
+
+        function rendererSetup() {
+            renderer = new THREE.WebGLRenderer();
+            renderer.physicallyCorrectLights = true;
+            renderer.antialias = true;
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            console.log(window.innerWidth, window.innerHeight);
+            renderer.setAnimationLoop( animate );
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            document.body.appendChild(renderer.domElement);
+            canvas = renderer.domElement;
+
+        }
+
+        function sceneSetup() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x000000);
+
+            // new RGBELoader()
+			// 		.load( 'kiara.hdr', function ( texture ) {
+
+			// 			texture.mapping = THREE.EquirectangularReflectionMapping;
+
+			// 			scene.background = texture;
+			// 			// scene.environment = texture;
+
+			// 		} );
+        }
+
+        function cameraSetup() {
+            camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+            // camera.position.z = 5;
+            // scene.add(camera);
+
+        }
+
+        function controlsSetup() {
+            // controls = new OrbitControls(camera, renderer.domElement);
+            let paramObject = {
+                body: boxBody,
+                mesh: mesh,
+            }
+
+            controls = new DeviceOrientationControls(camera, paramObject);
+
+        }
+
+        function lightSetup() {
+            // light = new THREE.DirectionalLight(0xffffff, 1);
+            // light.position.set(0, 0, 1);
+            // scene.add(light);
+
+            // let ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
+            // scene.add(ambientLight);
+
+
+        }
+
+        function worldSetup() {
+            world = new CANNON.World();
+            world.gravity.set(0, -6, 0);
+            world.solver.iterations = 20;
+
+            world.broadphase = new CANNON.NaiveBroadphase();
+            // world.broadphase.useBoundingBoxes = true;
+            world.allowSleep = false;
+            world.defaultContactMaterial.friction = 0.001;
+        }
+
+        function objectSetup() {
+            let windowWidth = window.innerWidth / 100;
+            let windowHeight = window.innerHeight / 100;
+
+            let larger = windowWidth > windowHeight ? windowWidth : windowHeight;
+            let smaller = windowWidth < windowHeight ? windowWidth : windowHeight;
+
+            // larger = 8;
+            // smaller = 4;
+
+            xPanel.update(larger);
+            yPanel.update(smaller);
+
+            mesh = new THREE.Object3D();
+            scene.add(mesh);
+            let origin = mesh;
+
+            origin.position.set(0, 0, 0);
+
+            origin.add(camera);
+            camera.position.set(0, 0, larger*2.5);
+            camera.lookAt(origin.position);
+
+            let aspectRatio = windowWidth / windowHeight;
+            camera.aspect = aspectRatio;
+            camera.fov = larger == windowWidth ? 37.5 : 75;
+            camera.updateProjectionMatrix();
+
+            let thickness = 1;
+
+            boxBody = new CANNON.Body({ mass: 0 });
+            boxBody.position.set(0, 0, 0);
+
+            let boxBase = new CANNON.Box(new CANNON.Vec3(windowWidth + thickness, windowHeight + thickness, thickness));
+            
+            let boxWideWall = new CANNON.Box(new CANNON.Vec3(thickness, windowHeight, larger));
+            let boxNarrWall = new CANNON.Box(new CANNON.Vec3(windowWidth, thickness, larger));
+
+            boxBody.addShape(boxWideWall, new CANNON.Vec3(windowWidth + thickness, 0, larger + thickness));
+            boxBody.addShape(boxWideWall, new CANNON.Vec3(-windowWidth - thickness, 0, larger + thickness));
+
+            boxBody.addShape(boxNarrWall, new CANNON.Vec3(0, windowHeight + thickness, larger + thickness));
+            boxBody.addShape(boxNarrWall, new CANNON.Vec3(0, -windowHeight - thickness, larger + thickness));
+            boxBody.addShape(boxBase);
+            boxBody.addShape(boxBase, new CANNON.Vec3(0, 0, larger*2 + thickness));
+            world.addBody(boxBody);
+
+            respawnPoint = new THREE.Object3D();
+
+            respawnPoint.position.set(0, 0, larger);
+            origin.add(respawnPoint);
+
+            // testBox = new CANNON.Body({ mass: 1 });
+            // let testBoxShape = new CANNON.Box(new CANNON.Vec3(1, 1, 1));
+            // testBox.addShape(testBoxShape);
+            // testBox.position.set(0, -20, 0);
+            // world.addBody(testBox);
+            // respawn(testBox);
+
+            let boxBaseGeom = new THREE.PlaneGeometry(windowWidth * 2, windowHeight * 2);
+            // let boxBaseReflector = new Reflector(boxBaseGeom, {
+            //     clipBias: 0.003,
+            //     textureWidth: window.innerWidth * window.devicePixelRatio,
+            //     textureHeight: window.innerHeight * window.devicePixelRatio,
+            //     color: 0xffffff,
+            // });
+            // boxBaseReflector.position.set(0, 0, -thickness);
+            // boxBaseReflector.lookAt(0, 0, 1);
+            // origin.add(boxBaseReflector);
+
+            let boxMaterial = new THREE.MeshPhysicalMaterial({ color: 0x000000, metalness: .6, roughness: 0.4, reflectivity: 1 });
+
+            let boxBaseMesh = new THREE.Mesh(boxBaseGeom, new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0xffffff, emissiveIntensity: 1 }));
+            boxBaseMesh.position.set(0, 0, thickness);
+            origin.add(boxBaseMesh);
+
+            let boxWallGeom = new THREE.PlaneGeometry(larger * 2, larger * 2);
+            let boxLeftWallMesh = new THREE.Mesh(boxWallGeom, boxMaterial);
+            boxLeftWallMesh.position.set(windowWidth, 0, larger);
+            boxLeftWallMesh.rotation.y = -Math.PI / 2;
+            origin.add(boxLeftWallMesh);
+
+            let boxRightWallMesh = new THREE.Mesh(boxWallGeom, boxMaterial);;
+            boxRightWallMesh.position.set(-windowWidth, 0, larger);
+            boxRightWallMesh.rotation.y = Math.PI / 2;
+            origin.add(boxRightWallMesh);
+
+            let boxNarrWallGeom = new THREE.PlaneGeometry(larger * 2, larger * 2);
+            let boxTopWallMesh = new THREE.Mesh(boxNarrWallGeom, boxMaterial);
+            boxTopWallMesh.position.set(0, windowHeight, larger);
+            boxTopWallMesh.rotation.x = Math.PI / 2;
+            origin.add(boxTopWallMesh);
+
+            let boxBottomWallMesh = new THREE.Mesh(boxNarrWallGeom, boxMaterial);
+            boxBottomWallMesh.position.set(0, -windowHeight, larger);
+            boxBottomWallMesh.rotation.x = -Math.PI / 2;
+            origin.add(boxBottomWallMesh);
+
+
+            let cameraPointLight = new THREE.PointLight(0xffffff, 50, 100);
+            cameraPointLight.position.set(0, 0, 0);
+            cameraPointLight.castShadow = true;
+            cameraPointLight.shadow.mapSize.width = 1024;
+            cameraPointLight.shadow.mapSize.height = 1024;
+            // origin.add(cameraPointLight);
+
+            // let floorSpotlight = new THREE.SpotLight(0xffffff, 10, 100, Math.PI);
+            // floorSpotlight.position.set(0, 0, 0);
+            // floorSpotlight.target.position.set(camera.position.x, camera.position.y, camera.position.z);
+            // floorSpotlight.castShadow = true;
+            // floorSpotlight.shadow.mapSize.width = 1024;
+            // floorSpotlight.shadow.mapSize.height = 1024;
+
+            // origin.add(floorSpotlight);
+
+            // let floorSpotlightHelper = new THREE.SpotLightHelper(floorSpotlight);
+            // origin.add(floorSpotlightHelper);
+
+
+            let rectAreaLight = new THREE.RectAreaLight(0xffffff, .5, windowWidth * 2, windowHeight * 2);
+            rectAreaLight.position.set(0, 0, thickness);
+            rectAreaLight.lookAt(0, 0, 1 + thickness);
+            origin.add(rectAreaLight);
+
+            let rectAreaLightHelper = new RectAreaLightHelper(rectAreaLight);
+            // origin.add(rectAreaLightHelper);
+
+
+        }
+
+        function respawn(body) {
+            if(respawnPoint) {
+                let worldPos = respawnPoint.getWorldPosition(new THREE.Vector3());
+                body.position.set(worldPos.x, worldPos.y, worldPos.z);
+                body.velocity.set(0, 0, 0);
+            }
+        }
+
+        function postProcessingSetup() {
+            composer = new EffectComposer(renderer);
+            composer.addPass(new RenderPass(scene, camera));
+
+            let bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight));
+            bloomPass.strength = 1000;
+            // bloomPass.radius = 0.1;
+            bloomPass.threshold = 1;
+            // composer.addPass(bloomPass);
+
+ 
+
+            let originDist = mesh.position.distanceTo(camera.position);
+            // alert(originDist);
+
+            let bokehPass = new BokehPass(scene, camera, {
+                focus: originDist * 0.8,
+                aperture: 0.002,
+                maxblur: 4,
+
+            });
+            composer.addPass(bokehPass);
+
+            // let pixelPass = new RenderPixelatedPass(12, scene, camera);
+            // composer.addPass(pixelPass);
+            // composer.addPass(bloomPass);
+
+            let outputPass = new OutputPass();
+            composer.addPass(outputPass);
+
+
+            
+        }
+
+        function debugSetup() {
+            cannonDebugger = new CannonDebugger(scene, world, {
+                onInit(body, mesh) {
+                    mesh.visible = false;
+                    document.addEventListener('keydown', (event) => {
+                    if (event.key === '=') {
+                        mesh.visible = !mesh.visible
+                    }
+                    })
+                },
+            });
+        }
+
+        function statsSetup() {
+            stats = new Stats();
+            stats.showPanel(0);
+            // document.body.appendChild(stats.dom);
+            
+            xPanel = stats.addPanel(new Stats.Panel('X', '#ff8', '#221'));
+            yPanel = stats.addPanel(new Stats.Panel('Y', '#f8f', '#212'));
+            zPanel = stats.addPanel(new Stats.Panel('Z', '#88f', '#122'));
+        }
+
+
+        let gravityMagnitude = 5;
+
+        function animate() {
+            let delta = clock.getDelta();
+            world.step(delta);
+
+            // controls.update();
+            stats.begin();
+            cannonDebugger.update();
+
+            meshMap.forEach((mesh, body) => {
+                mesh.position.copy(body.position);
+                mesh.quaternion.copy(body.quaternion);
+            });
+
+            let windowWidth = (window.innerWidth / 100) *2;
+            let windowHeight = (window.innerHeight / 100) *2;
+
+            world.bodies.forEach((body) => {
+                if(body.position.y < -50) {
+                    respawn(body);
+                }
+                
+            });
+
+
+
+            if(controls.enabled && controls.sensor.quaternion) {
+                let sensorQuaternion = controls.q;
+                
+                // const directionVector = new THREE.Vector3(0, 0, -1).applyQuaternion(sensorQuaternion).normalize();
+
+                // directionLine.geometry.setFromPoints([
+                //     new THREE.Vector3(0, 0, 0),
+                //     directionVector.clone().multiplyScalar(10) // Scale the vector for better visualization
+                // ]);
+                
+                // world.gravity.set(
+                //     directionVector.x * gravityMagnitude,
+                //     directionVector.y * gravityMagnitude,
+                //     directionVector.z * gravityMagnitude
+                // );
+
+                let target = new THREE.Quaternion().copy(boxBody.quaternion);
+                target.slerp(sensorQuaternion, 0.1);
+
+                boxBody.quaternion.copy(target);
+
+                // xPanel.update(sensorQuaternion.x);
+                // yPanel.update(sensorQuaternion.y);
+                // zPanel.update(sensorQuaternion.z);
+
+                mesh.quaternion.copy(target);
+
+                
+
+            }
+
+
+            // if(controls) {
+            //     yPanel.update(controls.sensorData.position.y);
+            //     boxBody.position.copy(controls.sensorData.position);
+            //     boxBody.quaternion.copy(controls.sensorData.quaternion);
+            // }
+
+            // if(controls.enabled) {
+            //     controls.update();
+            // }
+
+            composer.render();
+            // renderer.render(scene, camera);
+            stats.end();
+            delta = 0;
+
+            
+        }
+    </script>
+
+    
+</body>
+</html>
