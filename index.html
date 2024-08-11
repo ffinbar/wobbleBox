@@ -105,6 +105,61 @@
         }
     </script>
     <script type="module">
+        class DeviceOrientationControls {
+    constructor() {
+        this.quaternion = new THREE.Quaternion();
+        this.deviceOrientation = {};
+        this.screenOrientation = window.orientation || 0;
+
+        this.onDeviceOrientationChangeEvent = this.onDeviceOrientationChangeEvent.bind(this);
+        this.onScreenOrientationChangeEvent = this.onScreenOrientationChangeEvent.bind(this);
+
+        window.addEventListener('orientationchange', this.onScreenOrientationChangeEvent, false);
+        window.addEventListener('deviceorientation', this.onDeviceOrientationChangeEvent, false);
+
+        this.onScreenOrientationChangeEvent(); // Initialize screen orientation
+    }
+
+    onDeviceOrientationChangeEvent(event) {
+        this.enabled = true;
+        this.deviceOrientation = event;
+        this.updateQuaternion();
+    }
+
+    onScreenOrientationChangeEvent() {
+        this.screenOrientation = window.orientation || 0;
+    }
+
+    updateQuaternion() {
+        // console.log(this.deviceOrientation.beta);
+
+
+        const alpha = this.deviceOrientation.alpha ? THREE.MathUtils.degToRad(this.deviceOrientation.alpha) : 0; // Z
+        const beta = this.deviceOrientation.beta ? THREE.MathUtils.degToRad(this.deviceOrientation.beta) : 0; // X'
+        const gamma = this.deviceOrientation.gamma ? THREE.MathUtils.degToRad(this.deviceOrientation.gamma) : 0; // Y''
+        const orient = this.screenOrientation ? THREE.MathUtils.degToRad(this.screenOrientation) : 0; // O
+
+        const quaternion = new THREE.Quaternion();
+        quaternion.setFromEuler(new THREE.Euler(beta, alpha, -gamma, 'YXZ')); // 'YXZ' for device, 'ZXY' for screen
+
+        const orientQuaternion = new THREE.Quaternion();
+        orientQuaternion.setFromAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 2);
+
+        quaternion.multiply(orientQuaternion);
+
+        this.quaternion.copy(quaternion);
+    }
+
+    getQuaternion() {
+        return this.quaternion;
+    }
+
+    dispose() {
+        window.removeEventListener('orientationchange', this.onScreenOrientationChangeEvent, false);
+        window.removeEventListener('deviceorientation', this.onDeviceOrientationChangeEvent, false);
+    }
+}
+
         import * as THREE from 'three';
         import * as CANNON from 'cannon-es';
         import { OrbitControls } from 'https://unpkg.com/three/examples/jsm/controls/OrbitControls.js';
@@ -117,7 +172,7 @@
         import { RectAreaLightUniformsLib } from 'https://unpkg.com/three/examples/jsm/lights/RectAreaLightUniformsLib.js';
         import { RectAreaLightHelper } from 'https://unpkg.com/three/examples/jsm/helpers/RectAreaLightHelper.js';
         import { Reflector } from 'https://unpkg.com/three/examples/jsm/objects/Reflector.js';
-        import { DeviceOrientationControls } from './DeviceOrientationControls.js';
+        // import DeviceOrientationControls from './Orientation2.js';
         import { BokehPass } from 'https://unpkg.com/three/examples/jsm/postprocessing/BokehPass.js';
         import { RenderPixelatedPass } from 'https://unpkg.com/three/examples/jsm/postprocessing/RenderPixelatedPass.js';
         import { RGBELoader } from 'https://unpkg.com/three/examples/jsm/loaders/RGBELoader.js';
@@ -399,7 +454,7 @@
                 mesh: mesh,
             }
 
-            controls = new DeviceOrientationControls(camera, paramObject);
+            controls = new DeviceOrientationControls();
 
         }
 
@@ -584,7 +639,7 @@
                 maxblur: 4,
 
             });
-            composer.addPass(bokehPass);
+            // composer.addPass(bokehPass);
 
             // let pixelPass = new RenderPixelatedPass(12, scene, camera);
             // composer.addPass(pixelPass);
@@ -600,7 +655,7 @@
         function debugSetup() {
             cannonDebugger = new CannonDebugger(scene, world, {
                 onInit(body, mesh) {
-                    mesh.visible = false;
+                    mesh.visible = true;
                     document.addEventListener('keydown', (event) => {
                     if (event.key === '=') {
                         mesh.visible = !mesh.visible
@@ -646,10 +701,12 @@
                 
             });
 
+            controls.updateQuaternion();
 
 
-            if(controls.enabled && controls.q) {
-                let sensorQuaternion = controls.q;
+            if(controls.enabled) {
+                let sensorQuaternion = controls.quaternion;
+                console.log(sensorQuaternion);
                 
                 // const directionVector = new THREE.Vector3(0, 0, -1).applyQuaternion(sensorQuaternion).normalize();
 

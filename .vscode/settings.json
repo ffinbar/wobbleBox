@@ -1,0 +1,8 @@
+{
+	"liveServer.settings.https": {
+		"enable": true,
+		"cert": "/Users/fin/Documents/planets3JS/server.crt",
+		"key": "/Users/fin/Documents/planets3JS/server.key",
+		"passphrase": "deez"
+	}
+}
