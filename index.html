@@ -655,7 +655,7 @@
         function debugSetup() {
             cannonDebugger = new CannonDebugger(scene, world, {
                 onInit(body, mesh) {
-                    mesh.visible = true;
+                    mesh.visible = false;
                     document.addEventListener('keydown', (event) => {
                     if (event.key === '=') {
                         mesh.visible = !mesh.visible
