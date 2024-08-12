@@ -444,7 +444,7 @@ Make sure to enable Orientation Lock on your device for the best experience.`);
             mesh.position.copy(position);
             scene.add(mesh);
 
-            if(pointLights.length < 10) {
+            if(pointLights.length < 5) {
                 let pointLight = new THREE.PointLight(randomColor, 5);
                 pointLight.castShadow = false;
                 pointLight.position.set(0, 0, 0);
