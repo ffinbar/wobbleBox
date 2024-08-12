@@ -696,9 +696,9 @@ Make sure to enable Orientation Lock on your device for the best experience.`);
 
 
             let rectAreaLight = new THREE.RectAreaLight(0xffffff, .5, windowWidth * 2, windowHeight * 2);
-            rectAreaLight.position.set(0, 0, thickness);
+            rectAreaLight.position.set(0, 0, -thickness);
             rectAreaLight.lookAt(0, 0, 10 + thickness);
-            // origin.add(rectAreaLight);
+            origin.add(rectAreaLight);
 
             let rectAreaLightHelper = new RectAreaLightHelper(rectAreaLight);
             // origin.add(rectAreaLightHelper);
