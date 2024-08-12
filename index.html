@@ -10,10 +10,23 @@
             <button id="fullscreenButton">Go Fullscreen</button>
             <button id="clearBodies">Clear Objects</button>
         </ul>
+        <div id="startBlock">
+            <h1>Welcome</h1>
+            <p>This demo requires access to your device orientation sensors.<br><br>
+                After pressing start, click "Allow" to enable this feature.<br><br>
+                Tap the screen to create objects, and tilt your device to control the direction of gravity. <br><br>
+            </p>
+
+            <button id="requestPermissionButton">Start</button>
+            
+            <a href="https://finis.cool">finis.cool</a>
+        </div>
+
     <style>
         body {
             margin: 0;
             overflow: hidden;
+            font-family: Arial, sans-serif;
         }
 
         #buttons {
@@ -34,7 +47,7 @@
             justify-content: space-between;
         }
 
-        #buttons button {
+        #buttons button, #requestPermissionButton {
             padding: 0.5rem 1rem;
             margin: 0 0.5rem;
             border: none;
@@ -45,6 +58,47 @@
             border-radius: 0.25rem;
             transition: background-color 0.3s;
             opacity: 0.5;
+        }
+
+        #startBlock {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+            user-select: none;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+
+
+        }
+
+        #startBlock > * {
+            padding: 1rem;
+            margin: 0;
+        }
+
+        #startBlock > a {
+            color: white;
+            margin-top: 2rem;
+        }
+
+        #requestPermissionButton {
+            padding: 1rem 2rem;
+            font-size: 2rem;
+            background-color: #333;
+            color: #fff;
+            border: none;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            transition: background-color 0.3s;
+            opacity: 1;
         }
         
     </style>
@@ -94,6 +148,26 @@
                     isFullscreen = !!document.msFullscreenElement;
                 });
             });
+
+            document.addEventListener('DOMContentLoaded', () => {
+                //is ios safari device?
+                const isIosSafari = () => {
+                    const userAgent = window.navigator.userAgent.toLowerCase();
+                    return /iphone|ipad|ipod/.test(userAgent) && /safari/.test(userAgent) && !/crios/.test(userAgent);
+                };
+
+                if (isIosSafari()) {
+                    fullscreenButton.disabled = true;
+                    fullscreenButton.style.display = 'none';
+                    //check local storage to see if we have showed the alert before
+                    if (!sessionStorage.getItem('iosSafariAlert')) {
+                        sessionStorage.setItem('iosSafariAlert', 'true');
+                    alert(`Due to browser limitations, this demo may not work as expected on iOS Safari. Fullscreen mode and device orientation may not work as expected.
+                    
+Make sure to enable Orientation Lock on your device for the best experience.`);
+                    }
+                }
+            });
         </script>
     <script type="importmap">
         {
@@ -105,20 +179,40 @@
         }
     </script>
     <script type="module">
-        class DeviceOrientationControls {
-    constructor() {
-        this.quaternion = new THREE.Quaternion();
-        this.deviceOrientation = {};
-        this.screenOrientation = window.orientation || 0;
+    class DeviceOrientationControls {
+        constructor() {
+            this.quaternion = new THREE.Quaternion();
+            this.deviceOrientation = {};
+            this.screenOrientation = window.orientation || 0;
 
-        this.onDeviceOrientationChangeEvent = this.onDeviceOrientationChangeEvent.bind(this);
-        this.onScreenOrientationChangeEvent = this.onScreenOrientationChangeEvent.bind(this);
+            this.onDeviceOrientationChangeEvent = this.onDeviceOrientationChangeEvent.bind(this);
+            this.onScreenOrientationChangeEvent = this.onScreenOrientationChangeEvent.bind(this);
 
-        window.addEventListener('orientationchange', this.onScreenOrientationChangeEvent, false);
-        window.addEventListener('deviceorientation', this.onDeviceOrientationChangeEvent, false);
+            // Bind the request permission function to a user gesture event
+            document.getElementById('requestPermissionButton').addEventListener('click', this.requestPermission.bind(this));
 
-        this.onScreenOrientationChangeEvent(); // Initialize screen orientation
-    }
+            this.onScreenOrientationChangeEvent(); // Initialize screen orientation
+        }
+
+        requestPermission() {
+            document.getElementById('requestPermissionButton').disabled = true;
+            document.getElementById('requestPermissionButton').textContent = 'Requesting permission...';
+            if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                DeviceOrientationEvent.requestPermission()
+                    .then(permissionState => {
+                        if (permissionState === 'granted') {
+                            window.addEventListener('orientationchange', this.onScreenOrientationChangeEvent, false);
+                            window.addEventListener('deviceorientation', this.onDeviceOrientationChangeEvent, false);
+                        }
+                    })
+                    .catch(console.error);
+            } else {
+                // Handle non-iOS 13+ devices
+                window.addEventListener('orientationchange', this.onScreenOrientationChangeEvent, false);
+                window.addEventListener('deviceorientation', this.onDeviceOrientationChangeEvent, false);
+            }
+            document.getElementById('startBlock').remove();
+        }
 
     onDeviceOrientationChangeEvent(event) {
         this.enabled = true;
@@ -177,7 +271,6 @@
         import { RenderPixelatedPass } from 'https://unpkg.com/three/examples/jsm/postprocessing/RenderPixelatedPass.js';
         import { RGBELoader } from 'https://unpkg.com/three/examples/jsm/loaders/RGBELoader.js';
 
-        RectAreaLightUniformsLib.init();
 
         let touchX, touchY;
 
@@ -342,16 +435,16 @@
             world.addBody(body);
 
             let mesh = new THREE.Mesh(
-                randomShape instanceof CANNON.Box ? new THREE.BoxGeometry(randomScale * 2, randomScale * 2, randomScale * 2) :
+                randomShape instanceof CANNON.Box ? new THREE.BoxGeometry(randomScale*1.3, randomScale*1.3, randomScale*1.3) :
                 randomShape instanceof CANNON.Sphere ? new THREE.SphereGeometry(randomScale, 16, 16) :
                 new THREE.CylinderGeometry(randomScale, 0, randomScale*1.5, 16),
-                new THREE.MeshPhysicalMaterial({ color: randomColor, metalness: 1, roughness: 0.1, side: THREE.FrontSide })
+                new THREE.MeshPhysicalMaterial({ color: randomColor, metalness: 0.5, roughness: 0.1, side: THREE.FrontSide })
             );
 
             mesh.position.copy(position);
             scene.add(mesh);
 
-            if(pointLights.length < 5) {
+            if(pointLights.length < 10) {
                 let pointLight = new THREE.PointLight(randomColor, 5);
                 pointLight.castShadow = false;
                 pointLight.position.set(0, 0, 0);
@@ -423,6 +516,8 @@
             document.body.appendChild(renderer.domElement);
             canvas = renderer.domElement;
 
+            RectAreaLightUniformsLib.init();
+
         }
 
         function sceneSetup() {
@@ -490,6 +585,12 @@
             // larger = 8;
             // smaller = 4;
 
+            let bigCube = new THREE.Mesh(
+                new THREE.BoxGeometry(larger * 5, larger * 5, larger * 5),
+                new THREE.MeshStandardMaterial({ color: 0xffffff, side: THREE.BackSide, metalness: 0, roughness: 0.2 })
+            );
+            scene.add(bigCube);
+
             xPanel.update(larger);
             yPanel.update(smaller);
 
@@ -554,7 +655,7 @@
 
             let boxBaseMesh = new THREE.Mesh(boxBaseGeom, new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0xffffff, emissiveIntensity: 1 }));
             boxBaseMesh.position.set(0, 0, thickness);
-            origin.add(boxBaseMesh);
+            // origin.add(boxBaseMesh);
 
             let boxWallGeom = new THREE.PlaneGeometry(larger * 2, larger * 2);
             let boxLeftWallMesh = new THREE.Mesh(boxWallGeom, boxMaterial);
@@ -581,28 +682,23 @@
 
             let cameraPointLight = new THREE.PointLight(0xffffff, 50, 100);
             cameraPointLight.position.set(0, 0, 0);
-            cameraPointLight.castShadow = true;
+            cameraPointLight.castShadow = false;
             cameraPointLight.shadow.mapSize.width = 1024;
             cameraPointLight.shadow.mapSize.height = 1024;
-            // origin.add(cameraPointLight);
+            camera.add(cameraPointLight);
 
-            // let floorSpotlight = new THREE.SpotLight(0xffffff, 10, 100, Math.PI);
-            // floorSpotlight.position.set(0, 0, 0);
-            // floorSpotlight.target.position.set(camera.position.x, camera.position.y, camera.position.z);
-            // floorSpotlight.castShadow = true;
-            // floorSpotlight.shadow.mapSize.width = 1024;
-            // floorSpotlight.shadow.mapSize.height = 1024;
-
-            // origin.add(floorSpotlight);
-
-            // let floorSpotlightHelper = new THREE.SpotLightHelper(floorSpotlight);
-            // origin.add(floorSpotlightHelper);
+            let pointLight = new THREE.PointLight(0xffffff, 20, 100);
+            pointLight.position.set(0, 0, 0);
+            pointLight.castShadow = false;
+            pointLight.shadow.mapSize.width = 1024;
+            pointLight.shadow.mapSize.height = 1024;
+            scene.add(pointLight);
 
 
             let rectAreaLight = new THREE.RectAreaLight(0xffffff, .5, windowWidth * 2, windowHeight * 2);
             rectAreaLight.position.set(0, 0, thickness);
-            rectAreaLight.lookAt(0, 0, 1 + thickness);
-            origin.add(rectAreaLight);
+            rectAreaLight.lookAt(0, 0, 10 + thickness);
+            // origin.add(rectAreaLight);
 
             let rectAreaLightHelper = new RectAreaLightHelper(rectAreaLight);
             // origin.add(rectAreaLightHelper);
