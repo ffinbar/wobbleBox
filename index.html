@@ -259,6 +259,8 @@ Make sure to enable Orientation Lock on your device for the best experience.`);
         import { OrbitControls } from 'https://unpkg.com/three/examples/jsm/controls/OrbitControls.js';
         import { EffectComposer } from 'https://unpkg.com/three/examples/jsm/postprocessing/EffectComposer.js';
         import { RenderPass } from 'https://unpkg.com/three/examples/jsm/postprocessing/RenderPass.js';
+        import { LUTPass } from 'https://unpkg.com/three/examples/jsm/postprocessing/LUTPass.js';
+        import { LUTCubeLoader } from 'https://unpkg.com/three/examples/jsm/loaders/LUTCubeLoader.js';
         import { UnrealBloomPass } from 'https://unpkg.com/three/examples/jsm/postprocessing/UnrealBloomPass.js';
         import { OutputPass } from 'https://unpkg.com/three/examples/jsm/postprocessing/OutputPass.js';
         import CannonDebugger from 'https://unpkg.com/cannon-es-debugger@1.0.0/dist/cannon-es-debugger.js'
@@ -513,6 +515,9 @@ Make sure to enable Orientation Lock on your device for the best experience.`);
             renderer.setAnimationLoop( animate );
             renderer.shadowMap.enabled = true;
             renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            renderer.outputEncoding = THREE.sRGBEncoding;
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 1;
             document.body.appendChild(renderer.domElement);
             canvas = renderer.domElement;
 
@@ -587,9 +592,13 @@ Make sure to enable Orientation Lock on your device for the best experience.`);
 
             let bigCube = new THREE.Mesh(
                 new THREE.BoxGeometry(larger * 5, larger * 5, larger * 5),
-                new THREE.MeshStandardMaterial({ color: 0xffffff, side: THREE.BackSide, metalness: 0, roughness: 0.2 })
+                new THREE.MeshStandardMaterial({ color: 0xffffff, side: THREE.BackSide, metalness: 0, roughness: 0.2, emissive: 0xffffff, emissiveIntensity: 0.01 })
             );
             scene.add(bigCube);
+            let bcPointLight = new THREE.PointLight(0xffffff, 10, 100);
+            bcPointLight.position.set(0, 0, 0);
+            bcPointLight.castShadow = false;
+            bigCube.add(bcPointLight);
 
             xPanel.update(larger);
             yPanel.update(smaller);
@@ -651,7 +660,7 @@ Make sure to enable Orientation Lock on your device for the best experience.`);
             // boxBaseReflector.lookAt(0, 0, 1);
             // origin.add(boxBaseReflector);
 
-            let boxMaterial = new THREE.MeshPhysicalMaterial({ color: 0x000000, metalness: .6, roughness: 0.4, reflectivity: 1 });
+            let boxMaterial = new THREE.MeshPhysicalMaterial({ color: 0xffffff, metalness: .6, roughness: 0.3, reflectivity: 1 });
 
             let boxBaseMesh = new THREE.Mesh(boxBaseGeom, new THREE.MeshStandardMaterial({ color: 0x000000, emissive: 0xffffff, emissiveIntensity: 1 }));
             boxBaseMesh.position.set(0, 0, thickness);
@@ -692,13 +701,13 @@ Make sure to enable Orientation Lock on your device for the best experience.`);
             pointLight.castShadow = false;
             pointLight.shadow.mapSize.width = 1024;
             pointLight.shadow.mapSize.height = 1024;
-            scene.add(pointLight);
+            // scene.add(pointLight);
 
 
             let rectAreaLight = new THREE.RectAreaLight(0xffffff, .5, windowWidth * 2, windowHeight * 2);
             rectAreaLight.position.set(0, 0, -thickness);
             rectAreaLight.lookAt(0, 0, 10 + thickness);
-            origin.add(rectAreaLight);
+            // origin.add(rectAreaLight);
 
             let rectAreaLightHelper = new RectAreaLightHelper(rectAreaLight);
             // origin.add(rectAreaLightHelper);
@@ -719,10 +728,8 @@ Make sure to enable Orientation Lock on your device for the best experience.`);
             composer.addPass(new RenderPass(scene, camera));
 
             let bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight));
-            bloomPass.strength = 1000;
-            // bloomPass.radius = 0.1;
-            bloomPass.threshold = 1;
-            // composer.addPass(bloomPass);
+
+            composer.addPass(bloomPass);
 
  
 
@@ -731,18 +738,29 @@ Make sure to enable Orientation Lock on your device for the best experience.`);
 
             let bokehPass = new BokehPass(scene, camera, {
                 focus: originDist * 0.8,
-                aperture: 0.002,
+                aperture: 0.0025,
                 maxblur: 4,
 
             });
-            // composer.addPass(bokehPass);
+            composer.addPass(bokehPass);
+
+            let outputPass = new OutputPass();
+            composer.addPass(outputPass);
+
+            let lutPass = new LUTPass();
+            // composer.addPass(lutPass);
+
+            let lut;
+            let lutCubeLoader = new LUTCubeLoader();
+            lutCubeLoader.load('Bourbon 64.CUBE', function (result) {
+                lut = result;
+                lutPass.lut = lut.texture3D;
+            });
 
             // let pixelPass = new RenderPixelatedPass(12, scene, camera);
             // composer.addPass(pixelPass);
             // composer.addPass(bloomPass);
 
-            let outputPass = new OutputPass();
-            composer.addPass(outputPass);
 
 
             
