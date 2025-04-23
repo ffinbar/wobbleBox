@@ -440,28 +440,28 @@ Make sure to enable Orientation Lock on your device for the best experience.`);
                 randomShape instanceof CANNON.Box ? new THREE.BoxGeometry(randomScale*1.3, randomScale*1.3, randomScale*1.3) :
                 randomShape instanceof CANNON.Sphere ? new THREE.SphereGeometry(randomScale, 16, 16) :
                 new THREE.CylinderGeometry(randomScale, 0, randomScale*1.5, 16),
-                new THREE.MeshPhysicalMaterial({ color: randomColor, metalness: 0.5, roughness: 0.1, side: THREE.FrontSide })
+                new THREE.MeshBasicMaterial({ color: randomColor })
             );
 
             mesh.position.copy(position);
             scene.add(mesh);
 
-            if(pointLights.length < 5) {
-                let pointLight = new THREE.PointLight(randomColor, 5);
-                pointLight.castShadow = false;
-                pointLight.position.set(0, 0, 0);
-                mesh.add(pointLight);
-                pointLights.push(pointLight);
-            } else {
-                let randomIndex = Math.floor(Math.random() * pointLights.length);
-                let pointLight = pointLights[randomIndex];
-                pointLight.color.set(randomColor);
-                pointLight.intensity = 5;
-                mesh.add(pointLight);
-            }
+            // if(pointLights.length < 5) {
+            //     let pointLight = new THREE.PointLight(randomColor, 5);
+            //     pointLight.castShadow = false;
+            //     pointLight.position.set(0, 0, 0);
+            //     mesh.add(pointLight);
+            //     pointLights.push(pointLight);
+            // } else {
+            //     let randomIndex = Math.floor(Math.random() * pointLights.length);
+            //     let pointLight = pointLights[randomIndex];
+            //     pointLight.color.set(randomColor);
+            //     pointLight.intensity = 5;
+            //     mesh.add(pointLight);
+            // }
 
-            mesh.castShadow = true;
-            mesh.receiveShadow = true;
+            // mesh.castShadow = true;
+            // mesh.receiveShadow = true;
 
             meshMap.set(body, mesh);
 
@@ -742,7 +742,7 @@ Make sure to enable Orientation Lock on your device for the best experience.`);
                 maxblur: 12,
 
             });
-            composer.addPass(bokehPass);
+            // composer.addPass(bokehPass);
 
             let outputPass = new OutputPass();
             composer.addPass(outputPass);
@@ -820,7 +820,7 @@ Make sure to enable Orientation Lock on your device for the best experience.`);
 
             if(controls.enabled) {
                 let sensorQuaternion = controls.quaternion;
-                console.log(sensorQuaternion);
+                // console.log(sensorQuaternion);
                 
                 // const directionVector = new THREE.Vector3(0, 0, -1).applyQuaternion(sensorQuaternion).normalize();
 
